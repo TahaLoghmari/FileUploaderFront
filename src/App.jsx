@@ -33,7 +33,7 @@ function App() {
           navigate("/login");
           return;
         }
-        const timeUntilExpiry = (decoded.exp - currentTime) * 1000; 
+        const timeUntilExpiry = (decoded.exp - currentTime) * 1000;
         const logoutTimer = setTimeout(() => {
           setAuth(null);
           localStorage.removeItem("token");
