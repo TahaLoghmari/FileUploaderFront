@@ -44,24 +44,18 @@ export default function AddFile({ id, onClose, setFolderHiearchy }) {
     },
   });
   const onSubmit = async (data) => {
-    setLoading(true);
     const formData = new FormData();
-    if (data.file) {
-      formData.append("file", data.file);
-    }
-    fetch(
-      `${API_BASE_URL}/user/${Auth.userId}/Folders/Files/addFile${
-        id ? `/${id}` : ""
-      }`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        method: "POST",
-        body: formData,
-      }
-    )
+    formData.append("file", data.file);
+    setLoading(true);
+    fetch(`${API_BASE_URL}/user/${Auth.userId}/Folders/Files/addFile/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      method: "POST",
+      body: formData,
+    })
       .then((res) => {
+        setLoading(false);
         if (!res.ok) throw new Error("Error Occured while Uploading the File");
         return res.json();
       })
@@ -69,8 +63,8 @@ export default function AddFile({ id, onClose, setFolderHiearchy }) {
         setLoading(false);
         setFolderHiearchy((prevState) => {
           const newState = { ...prevState };
-          newState[id] = {
-            ...newState[id],
+          newState.byFolderId[id] = {
+            ...newState.byFolderId[id],
             childrenLoaded: false,
           };
           return newState;
@@ -78,7 +72,10 @@ export default function AddFile({ id, onClose, setFolderHiearchy }) {
         console.log(data);
         onClose();
       })
-      .catch((error) => console.log(error));
+      .catch((error) => {
+        setLoading(false);
+        console.log(error);
+      });
   };
   if (loading)
     return (
@@ -99,19 +96,26 @@ export default function AddFile({ id, onClose, setFolderHiearchy }) {
           <FormField
             control={form.control}
             name="file"
-            render={({ field: { onChange, ...fieldProps } }) => (
-              <FormItem>
-                <FormControl>
-                  <Input
-                    type="file"
-                    id="file"
-                    onChange={(e) => onChange(e.target.files)}
-                    {...fieldProps}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+            render={({ field }) => {
+              const { onChange, name, ref } = field;
+
+              return (
+                <FormItem>
+                  <FormLabel>Select File</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="file"
+                      ref={ref}
+                      name={name}
+                      onChange={(e) => {
+                        onChange(e.target.files);
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
           />
 
           <div className="flex justify-end gap-2">

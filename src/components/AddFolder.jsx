@@ -65,8 +65,8 @@ export default function AddFolder({ id, onClose, setFolderHiearchy }) {
         setLoading(false);
         setFolderHiearchy((prevState) => {
           const newState = { ...prevState };
-          newState[id] = {
-            ...newState[id],
+          newState.byFolderId[id] = {
+            ...newState.byFolderId[id],
             childrenLoaded: false,
           };
           return newState;
