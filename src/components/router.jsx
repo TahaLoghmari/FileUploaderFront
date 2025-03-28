@@ -3,8 +3,7 @@ import App from "../App";
 import Login from "./Login";
 import Register from "./Register";
 import RootFolder from "./RootFolder";
-import AddFolder from "./AddFolder";
-import AddFile from "./AddFile";
+import SharedFileView from "./SharedFileView";
 
 let router = createBrowserRouter([
   {
@@ -17,6 +16,10 @@ let router = createBrowserRouter([
       },
       { path: "folders/:folderId/:fileId", element: <File /> },
     ],
+  },
+  {
+    path: "/share/:token",
+    element: <SharedFileView />,
   },
   {
     path: "/login",

@@ -30,7 +30,13 @@ const formSchema = z.object({
   }),
 });
 
-export default function AddFolder({ id, onClose, setFolderHiearchy }) {
+export default function AddFolder({
+  id,
+  onClose,
+  setFolderHiearchy,
+  LoadChildren,
+  showChildren,
+}) {
   const token = localStorage.getItem("token");
   const [loading, setLoading] = useState(false);
   const { Auth } = useContext(States);
@@ -55,7 +61,7 @@ export default function AddFolder({ id, onClose, setFolderHiearchy }) {
         body: JSON.stringify({
           Name: data.name,
         }),
-      }
+      },
     )
       .then((res) => {
         if (!res.ok) throw new Error("Error Occured while Creating the folder");
@@ -72,15 +78,17 @@ export default function AddFolder({ id, onClose, setFolderHiearchy }) {
           return newState;
         });
         console.log(data);
+        LoadChildren(id);
+        showChildren(id);
         onClose();
       })
       .catch((error) => console.log(error));
   };
   if (loading)
     return (
-      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-        <div className="bg-card p-6 rounded-lg shadow-lg text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full inline-block mb-4"></div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+        <div className="bg-card rounded-lg p-6 text-center shadow-lg">
+          <div className="border-primary mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
           <p className="text-lg font-medium">Creating folder...</p>
         </div>
       </div>

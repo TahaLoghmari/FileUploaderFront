@@ -8,29 +8,50 @@ import {
   AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogCancel,
+  AlertDialogCancel
 } from "@/components/ui/alert-dialog";
 import { API_BASE_URL } from "../lib/api";
 
-export default function ShareFile({ fileId, userId, onClose }) {
-  const [duration, setDuration] = useState("");
+export default function ShareFile({ fileId, userId }) {
+  const [duration, setDuration] = useState("1d");
   const [shareLink, setShareLink] = useState("");
-
-  const handleSubmit = () => {
-    fetch(
-      `${API_BASE_URL}/user/${userId}/folders/Files/share/${fileId}?duration=${duration}`,
-      {
-        method: "POST",
-      }
-    )
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to generate share link");
-        return res.json();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  
+  const handleGenerateLink = () => {
+    setLoading(true);
+    setError("");
+    
+    fetch(`${API_BASE_URL}/user/${userId}/folders/Files/share/${fileId}?duration=${duration}`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${localStorage.getItem("token")}`
+      },
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("Failed to generate share link");
+        }
+        return response.json();
       })
-      .then((data) => {
+      .then(data => {
         setShareLink(data.shareLink);
+        setLoading(false);
       })
-      .catch((error) => console.error(error));
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(shareLink)
+      .then(() => {
+        alert("Link copied to clipboard!");
+      })
+      .catch(err => {
+        console.error("Failed to copy: ", err);
+      });
   };
 
   return (
@@ -44,35 +65,48 @@ export default function ShareFile({ fileId, userId, onClose }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Share File</AlertDialogTitle>
           <AlertDialogDescription>
-            Enter the duration the share link should remain active (e.g. "1d"
-            for one day, "10d" for ten days).
+            Generate a link to share this file. Specify how long the link should be valid.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="flex flex-col gap-4">
-          <input
-            type="text"
-            placeholder="Duration (e.g. 1d)"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            className="border rounded p-2"
-          />
-          <Button onClick={handleSubmit}>Generate Link</Button>
+        
+        <div className="flex flex-col gap-4 my-4">
+          <div className="flex gap-2 items-center">
+            <label htmlFor="duration" className="w-24">Link Duration:</label>
+            <input
+              id="duration"
+              type="text"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              placeholder="e.g., 1d, 7d, 30d"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+            <Button onClick={handleGenerateLink} disabled={loading}>
+              {loading ? "Generating..." : "Generate"}
+            </Button>
+          </div>
+          
+          {error && (
+            <div className="text-red-500 text-sm">{error}</div>
+          )}
+          
           {shareLink && (
-            <div className="pt-2">
-              <p>Share this link:</p>
-              <a
-                href={shareLink}
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary underline"
-              >
-                {shareLink}
-              </a>
+            <div className="mt-4 p-4 border rounded-md bg-muted">
+              <p className="font-semibold mb-2">Share this link:</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={shareLink}
+                  readOnly
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+                <Button onClick={copyToClipboard}>Copy</Button>
+              </div>
             </div>
           )}
         </div>
+        
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose}>Close</AlertDialogCancel>
+          <AlertDialogCancel>Close</AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

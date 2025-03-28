@@ -17,18 +17,22 @@ import { AlertDialog, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AddFolder from "./AddFolder";
 import AddFile from "./AddFile";
 import { API_BASE_URL } from "../lib/api";
-import ShareFolder from "./ShareFolder";
 import DeleteFolder from "./DeleteFolder";
 import DeleteFile from "./DeleteFile";
+import { useBreakpoint } from "./UseBreakpoint";
 
 export default function RootFolder() {
   const { rootFolder, Auth } = useContext(States);
-  const [FolderDialogOpen, setFolderDialogOpen] = useState(false);
+  const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
+  const [deleteFolderDialogOpen, setDeleteFolderDialogOpen] = useState(false);
+  const [deleteFileDialogOpen, setDeleteFileDialogOpen] = useState(false);
   const [FileDialogOpen, setFileDialogOpen] = useState(false);
   const [loadingFolders, setLoadingFolders] = useState(true);
   const [activeFolder, setActiveFolder] = useState(rootFolder.id);
+  const breakpoint = useBreakpoint();
   const [loading, setLoading] = useState(false);
   const token = localStorage.getItem("token");
+
   const formatDate = (dateString) => {
     if (!dateString) return "--";
     return new Intl.DateTimeFormat("en-US", {
@@ -58,7 +62,7 @@ export default function RootFolder() {
         fileChildIds: [],
         isExpanded: false,
         childrenLoaded: false,
-        Path: `${rootFolder.name}`,
+        Path: `${rootFolder.id}`,
         createdTime: formatDate(rootFolder.createdAt),
       },
     },
@@ -94,22 +98,18 @@ export default function RootFolder() {
     const file = folderHiearchy.byFileId[fileId];
     if (loading) {
       return (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-card p-6 rounded-lg shadow-lg text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full inline-block mb-4"></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-card rounded-lg p-6 text-center shadow-lg">
+            <div className="border-primary mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
             <p className="text-lg font-medium">Downloading File...</p>
           </div>
         </div>
       );
     }
     return (
-      <div className="fixed inset-0 bg-black/70 z-50 cursor-auto text-sm text-primary">
+      <div className="text-primary fixed inset-0 z-50 cursor-auto bg-black/70 text-sm">
         <div
-          className={`
-            fixed h-full w-[20%] bg-secondary right-0 p-6 flex flex-col 
-            justify-between transform transition-all duration-300 ease-out
-            ${file.Opened ? "translate-x-0" : "translate-x-full"}
-          `}
+          className={`bg-secondary fixed right-0 flex h-full w-full transform flex-col justify-between p-6 transition-all duration-300 ease-out sm:w-[70%] md:w-[60%] lg:w-[45%] xl:w-[30%] ${file.Opened ? "translate-x-0" : "translate-x-full"} `}
           onClick={(e) => {
             e.stopPropagation();
           }}
@@ -130,11 +130,11 @@ export default function RootFolder() {
               </p>
             </div>
             <X
-              className="absolute top-6 right-10 h-4 w-4 hover:text-[#52b2f9] cursor-pointer"
+              className="absolute top-6 right-10 h-4 w-4 cursor-pointer hover:text-[#52b2f9]"
               onClick={() => handleOpenedState(fileId)}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="grid grid-flow-col gap-2">
             <Button
               variant="outline"
               className="cursor-pointer"
@@ -143,8 +143,8 @@ export default function RootFolder() {
               Close
             </Button>
             <AlertDialog
-              open={FolderDialogOpen}
-              onOpenChange={setFolderDialogOpen}
+              open={deleteFileDialogOpen}
+              onOpenChange={setDeleteFileDialogOpen}
             >
               <AlertDialogTrigger asChild className="text-xs">
                 <Button variant="outline" className="cursor-pointer">
@@ -158,13 +158,7 @@ export default function RootFolder() {
                 userId={Auth.userId}
               />
             </AlertDialog>
-            <ShareFile
-              fileId={fileId}
-              userId={Auth.userId}
-              onClose={() => {
-                /* close dialog handler */
-              }}
-            />
+            <ShareFile fileId={fileId} userId={Auth.userId} />
             <Button
               className="cursor-pointer"
               onClick={(e) => {
@@ -176,14 +170,16 @@ export default function RootFolder() {
                     headers: {
                       Authorization: `Bearer ${token}`,
                     },
-                  }
+                  },
                 )
                   .then((response) => {
+                    if (!response.ok) {
+                      throw new Error(`Download failed: ${response.status}`);
+                    }
                     setLoading(false);
                     return response.blob();
                   })
                   .then((blob) => {
-                    setLoading(false);
                     const url = window.URL.createObjectURL(blob);
                     const link = document.createElement("a");
                     link.href = url;
@@ -192,6 +188,11 @@ export default function RootFolder() {
                     link.click();
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(link);
+                  })
+                  .catch((error) => {
+                    console.error("Download error:", error);
+                    setLoading(false);
+                    alert("Failed to download file. Please try again.");
                   });
               }}
             >
@@ -222,10 +223,10 @@ export default function RootFolder() {
           setFolderHiearchy((prevState) => {
             const newState = { ...prevState };
             newState.byFolderId[folderId].childIds = data.childFolders.map(
-              (child) => child.id
+              (child) => child.id,
             );
             newState.byFolderId[folderId].fileChildIds = data.files.map(
-              (child) => child.id
+              (child) => child.id,
             );
             newState.byFolderId[folderId].childrenLoaded = true;
             data.childFolders.forEach((child) => {
@@ -236,7 +237,7 @@ export default function RootFolder() {
                 fileChildIds: [],
                 isExpanded: false,
                 childrenLoaded: false,
-                Path: newState.byFolderId[folderId].Path + " > " + child.name,
+                Path: newState.byFolderId[folderId].Path + " > " + child.id,
                 createdTime: formatDate(child.createdAt),
               };
             });
@@ -244,7 +245,7 @@ export default function RootFolder() {
               newState.byFileId[child.id] = {
                 name: child.name,
                 parentId: folderId,
-                Path: newState.byFolderId[folderId].Path + " > " + child.name,
+                Path: newState.byFolderId[folderId].Path + " > " + child.id,
                 createdTime: formatDate(child.createdAt),
                 uploadPath: child.uploadPath,
                 size: formatFileSize(child.size),
@@ -257,7 +258,7 @@ export default function RootFolder() {
         })
         .catch((error) => console.error(error));
     },
-    [Auth?.userId, token, folderHiearchy]
+    [Auth?.userId, token, folderHiearchy],
   );
   const showChildren = (folderId) => {
     if (
@@ -269,12 +270,12 @@ export default function RootFolder() {
     return (
       <>
         {folderHiearchy.byFolderId[folderId].childIds.map((childId) => (
-          <div key={childId} className="flex-col border-l ml-4 pr-0 w-auto">
+          <div key={childId} className="ml-4 w-auto flex-col border-l pr-0">
             {" "}
             <div
-              className={`flex text-xs gap-2 mt-2 items-center p-1 cursor-pointer transition-all duration-100 truncate hover:text-[#52b2f9] ${
+              className={`mt-2 flex cursor-pointer items-center gap-2 truncate p-1 text-xs transition-all duration-100 hover:text-[#52b2f9] ${
                 activeFolder == childId
-                  ? `border-l-4 bg-secondary border-l-[#52b2f9]`
+                  ? `bg-secondary border-l-4 border-l-[#52b2f9]`
                   : ""
               }`}
               onClick={() => {
@@ -286,7 +287,7 @@ export default function RootFolder() {
               }}
             >
               <div
-                className={`transform transition-transform duration-300 min-w-4 ${
+                className={`min-w-4 transform transition-transform duration-300 ${
                   folderHiearchy.byFolderId[childId]?.isExpanded
                     ? "rotate-90"
                     : ""
@@ -294,7 +295,7 @@ export default function RootFolder() {
               >
                 <ChevronRight className="h-3 w-3" />
               </div>
-              <p className="truncate text-ellipsis overflow-hidden">
+              <p className="truncate overflow-hidden text-ellipsis">
                 {folderHiearchy.byFolderId[childId]?.name}
               </p>
             </div>
@@ -314,17 +315,9 @@ export default function RootFolder() {
   }, [rootFolder?.id, Auth?.userId, LoadChildren]);
   if (loadingFolders) {
     return (
-      <div className="flex w-full h-full flex-col">
-        <div className="w-[15%] border-r h-full p-6 flex flex-col gap-2">
-          <AlertDialog
-            open={FolderDialogOpen}
-            onOpenChange={setFolderDialogOpen}
-          ></AlertDialog>
-          <AlertDialog
-            open={FileDialogOpen}
-            onOpenChange={setFileDialogOpen}
-          ></AlertDialog>
-          <div className="flex items-center justify-center mt-4">
+      <div className="flex h-full w-full flex-col">
+        <div className="flex h-full w-[15%] flex-col gap-2 border-r p-6">
+          <div className="mt-4 flex items-center justify-center">
             <p>Loading folders...</p>
           </div>
         </div>
@@ -332,63 +325,66 @@ export default function RootFolder() {
     );
   }
   return (
-    <div className="flex w-full h-full ">
-      <div className="w-[15%] border-r h-full p-6 flex flex-col gap-2">
-        <AlertDialog open={FolderDialogOpen} onOpenChange={setFolderDialogOpen}>
+    <div className="flex h-full w-full flex-col md:flex-row">
+      <div className="fixed bottom-0 flex w-full justify-between gap-2 border-t p-6 md:static md:h-full md:w-[30%] md:flex-col md:justify-normal md:border-t-0 md:border-r lg:w-[25%] xl:w-[15%]">
+        <AlertDialog
+          open={newFolderDialogOpen}
+          onOpenChange={setNewFolderDialogOpen}
+        >
           <AlertDialogTrigger asChild className="text-xs">
-            <button className="flex gap-3 text-sm items-center p-2 border rounded-sm bg-secondary hover:bg-[#1f3c56] cursor-pointer hover:border-[#2d6090] hover:text-[#52b2f9] w-full">
-              <FolderPlus className="h-4 w-4" />
-              <p>New Folder</p>
-            </button>
+            {breakpoint == "md" ? (
+              <button className="bg-secondary flex w-full cursor-pointer items-center gap-3 rounded-sm border p-2 text-sm hover:border-[#2d6090] hover:bg-[#1f3c56] hover:text-[#52b2f9]">
+                <FolderPlus className="h-4 w-4" />
+                <p>New Folder</p>
+              </button>
+            ) : (
+              <FolderPlus className="h-6 w-6" />
+            )}
           </AlertDialogTrigger>
           <AddFolder
-            onClose={() => setFolderDialogOpen(false)}
+            onClose={() => setNewFolderDialogOpen(false)}
             id={activeFolder}
             setFolderHiearchy={setFolderHiearchy}
+            LoadChildren={LoadChildren}
+            showChildren={showChildren}
           />
         </AlertDialog>
         <AlertDialog open={FileDialogOpen} onOpenChange={setFileDialogOpen}>
           <AlertDialogTrigger asChild className="text-xs">
-            <button className="flex gap-3 text-sm items-center p-2 border rounded-sm bg-secondary hover:bg-[#1f3c56] cursor-pointer hover:border-[#2d6090] hover:text-[#52b2f9] w-full">
-              <FilePlus className="h-4 w-4" />
-              <p>New File</p>
-            </button>
+            {breakpoint == "md" ? (
+              <button className="bg-secondary flex w-full cursor-pointer items-center gap-3 rounded-sm border p-2 text-sm hover:border-[#2d6090] hover:bg-[#1f3c56] hover:text-[#52b2f9]">
+                <FilePlus className="h-4 w-4" />
+                <p>New File</p>
+              </button>
+            ) : (
+              <FilePlus className="h-6 w-6" />
+            )}
           </AlertDialogTrigger>
           <AddFile
             onClose={() => setFileDialogOpen(false)}
             id={activeFolder}
             setFolderHiearchy={setFolderHiearchy}
+            LoadChildren={LoadChildren}
+            showChildren={showChildren}
           />
         </AlertDialog>
         {activeFolder != rootFolder.id ? (
           <AlertDialog
-            open={FolderDialogOpen}
-            onOpenChange={setFolderDialogOpen}
+            open={deleteFolderDialogOpen}
+            onOpenChange={setDeleteFolderDialogOpen}
           >
             <AlertDialogTrigger asChild className="text-xs">
-              <button className="flex gap-3 text-sm items-center p-2 border rounded-sm bg-secondary hover:bg-[#1f3c56] cursor-pointer hover:border-[#2d6090] hover:text-[#52b2f9] w-full">
-                <Share2 className="h-4 w-4" />
-                <p>Share Folder</p>
-              </button>
-            </AlertDialogTrigger>
-            <ShareFolder onClose={() => setFolderDialogOpen(false)} />
-          </AlertDialog>
-        ) : (
-          ""
-        )}
-        {activeFolder != rootFolder.id ? (
-          <AlertDialog
-            open={FolderDialogOpen}
-            onOpenChange={setFolderDialogOpen}
-          >
-            <AlertDialogTrigger asChild className="text-xs">
-              <button className="flex gap-3 text-sm items-center p-2 border rounded-sm bg-secondary hover:bg-[#1f3c56] cursor-pointer hover:border-[#2d6090] hover:text-[#52b2f9] w-full">
-                <Trash2 className="h-4 w-4" />
-                <p>Delete Folder</p>
-              </button>
+              {breakpoint == "md" ? (
+                <button className="bg-secondary flex w-full cursor-pointer items-center gap-3 rounded-sm border p-2 text-sm hover:border-[#2d6090] hover:bg-[#1f3c56] hover:text-[#52b2f9]">
+                  <Trash2 className="h-4 w-4" />
+                  <p>Delete Folder</p>
+                </button>
+              ) : (
+                <Trash2 className="h-6 w-6" />
+              )}
             </AlertDialogTrigger>
             <DeleteFolder
-              onClose={() => setFolderDialogOpen(false)}
+              onClose={() => setDeleteFolderDialogOpen(false)}
               activeFolder={activeFolder}
               userId={Auth.userId}
               setFolderHiearchy={setFolderHiearchy}
@@ -398,62 +394,76 @@ export default function RootFolder() {
         ) : (
           ""
         )}
-        <div className="flex-col w-full max-w-full ">
-          <div
-            className={`flex text-xs gap-3 mt-4 items-center  p-2  cursor-pointer transition-all duration-100 w-full max-w-full ${
-              activeFolder == rootFolder.id
-                ? ` border-l-5 bg-secondary border-l-[#52b2f9]`
-                : ""
-            }`}
-            onClick={() => {
-              handleArrowState(rootFolder.id);
-              setActiveFolder(rootFolder.id);
-            }}
-          >
+        {breakpoint == "md" ? (
+          <div className="w-full max-w-full flex-col">
             <div
-              className={`transform transition-transform duration-300 max-w-full ${
-                folderHiearchy.byFolderId[rootFolder.id].isExpanded
-                  ? "rotate-90"
+              className={`mt-4 flex w-full max-w-full cursor-pointer items-center gap-3 p-2 text-xs transition-all duration-100 ${
+                activeFolder == rootFolder.id
+                  ? `bg-secondary border-l-5 border-l-[#52b2f9]`
                   : ""
               }`}
+              onClick={() => {
+                handleArrowState(rootFolder.id);
+                setActiveFolder(rootFolder.id);
+              }}
             >
-              <ChevronRight className="h-4 w-4" />
+              <div
+                className={`max-w-full transform transition-transform duration-300 ${
+                  folderHiearchy.byFolderId[rootFolder.id].isExpanded
+                    ? "rotate-90"
+                    : ""
+                }`}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </div>
+              <p className="hover:text-[#52b2f9]">{rootFolder.name}</p>
             </div>
-            <p className="hover:text-[#52b2f9] ">{rootFolder.name}</p>
+            {folderHiearchy.byFolderId[rootFolder.id].isExpanded
+              ? showChildren(rootFolder.id)
+              : ""}
           </div>
-          {folderHiearchy.byFolderId[rootFolder.id].isExpanded
-            ? showChildren(rootFolder.id)
-            : ""}
-        </div>
+        ) : (
+          ""
+        )}
       </div>
-      <div className="p-6 w-full">
+      <div className="p-6 md:w-[70%] lg:w-[75%] xl:w-[85%]">
         <p className="text-sm text-[#52b2f9]">
           {folderHiearchy.byFolderId[activeFolder].Path.split(" > ").map(
-            (segment, index, array) => (
+            (id, index, array) => (
               <React.Fragment key={index}>
-                <span className="text-[#52b2f9]">{segment}</span>
+                <span
+                  className="hover:text-primary cursor-pointer text-[#52b2f9]"
+                  onClick={() => {
+                    setActiveFolder(id);
+                    if (!folderHiearchy.byFolderId[id]?.childrenLoaded) {
+                      LoadChildren(id);
+                    }
+                  }}
+                >
+                  {folderHiearchy.byFolderId[id].name}
+                </span>
                 {index < array.length - 1 && (
                   <span className="text-primary"> &gt; </span>
                 )}
               </React.Fragment>
-            )
+            ),
           )}
         </p>
-        <div className="flex items-center w-full mt-2 text-sm">
-          <div className=" w-[60%] hover:bg-secondary p-3 rounded-sm cursor-pointer ">
+        <div className="mt-2 flex w-full items-center text-sm">
+          <div className="hover:bg-secondary w-[60%] cursor-pointer rounded-sm p-3">
             Name
           </div>
-          <div className=" w-[20%] hover:bg-secondary p-3 rounded-sm cursor-pointer ">
+          <div className="hover:bg-secondary w-[20%] cursor-pointer rounded-sm p-3">
             Size
           </div>
-          <div className=" w-[20%] hover:bg-secondary p-3 rounded-sm cursor-pointer">
+          <div className="hover:bg-secondary w-[20%] cursor-pointer rounded-sm p-3">
             Created
           </div>
         </div>
-        <div className="flex flex-col gap-2 mt-2 text-xs">
+        <div className="mt-2 flex flex-col gap-2 text-xs">
           {folderHiearchy.byFolderId[activeFolder].childIds.map((folderId) => (
             <div
-              className="bg-secondary rounded-sm w-full flex border hover:bg-[#1f3c56] cursor-pointer hover:border-[#2d6090] hover:text-[#52b2f9]"
+              className="bg-secondary flex w-full cursor-pointer rounded-sm border hover:border-[#2d6090] hover:bg-[#1f3c56] hover:text-[#52b2f9]"
               key={folderId}
               onClick={() => {
                 setActiveFolder(folderId);
@@ -463,8 +473,8 @@ export default function RootFolder() {
                 }
               }}
             >
-              <div className="flex gap-2 w-[60%] p-3">
-                <Folder className="w-4 h-4" />
+              <div className="flex w-[60%] gap-2 overflow-hidden p-3">
+                <Folder className="h-4 w-4" />
                 <p>{folderHiearchy.byFolderId[folderId].name}</p>
               </div>
               <div className="w-[20%] p-3">
@@ -480,12 +490,12 @@ export default function RootFolder() {
           {folderHiearchy.byFolderId[activeFolder].fileChildIds.map(
             (fileId) => (
               <div
-                className="bg-secondary rounded-sm w-full flex border hover:bg-[#1f3c56] cursor-pointer hover:border-[#2d6090] hover:text-[#52b2f9]"
+                className="bg-secondary flex w-full cursor-pointer rounded-sm border hover:border-[#2d6090] hover:bg-[#1f3c56] hover:text-[#52b2f9]"
                 key={fileId}
                 onClick={() => handleOpenedState(fileId)}
               >
-                <div className="flex gap-2 w-[60%] p-3">
-                  <File className="w-4 h-4" />
+                <div className="flex w-[60%] gap-2 overflow-hidden p-3">
+                  <File className="h-4 w-4" />
                   <p>{folderHiearchy.byFileId[fileId].name}</p>
                 </div>
                 <div className="w-[20%] p-3">
@@ -499,7 +509,7 @@ export default function RootFolder() {
                 {folderHiearchy.byFileId[fileId].Opened &&
                   handleFileDetails(fileId)}
               </div>
-            )
+            ),
           )}
         </div>
       </div>
